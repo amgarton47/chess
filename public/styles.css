@@ -71,3 +71,13 @@
 #rank_labels > div:not(:first-child) {
   padding-top: 63px;
 }
+
+/* .piece_container {
+  position: relative;
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  width: 100px;
+  height: 100px;
+} */

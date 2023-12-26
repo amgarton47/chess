@@ -150,68 +150,6 @@ function filerank_to_idx(filerank) {
   return 8 * (8 - rank) + "abcdefgh".indexOf(file);
 }
 
-// checks if "to" square is in list of legal "from" squares
-function is_legal_move(from, to, board) {
-  //   const from_idx = filerank_to_idx(from);
-  const to_idx = filerank_to_idx(to);
-
-  const legal_moves = get_legal_moves(from, board);
-  console.log(legal_moves);
-  pretty_print(board);
-  return legal_moves.includes(to_idx);
-}
-
-// all the fun move logic 😍
-function get_legal_moves(from, board) {
-  //   const file = from[0];
-  const rank = parseInt(from[1]);
-  const from_idx = filerank_to_idx(from);
-  const legal_moves = [];
-
-  console.log(from_idx);
-
-  // white pawn moves
-  if (board[from_idx] == 1) {
-    // if up one is in play and unoccupied
-    if (from_idx - 8 >= 0 && board[from_idx - 8] == 0) {
-      legal_moves.push(from_idx - 8);
-
-      // now same for up two, if on starting rank
-      if (rank == 2 && from_idx - 16 >= 0 && board[from_idx - 16] == 0) {
-        legal_moves.push(from_idx - 16);
-      }
-    }
-
-    // now check possible capturing squares
-    // if ↗️ is in play and occupied by a black non-king piece, we can take
-    if (
-      from_idx - 1 - 8 >= 0 &&
-      board[from_idx - 1 - 8] < 0 &&
-      board[from_idx - 1 - 8] != -5
-    ) {
-      legal_moves.push(from_idx - 1 - 8);
-    }
-
-    // check same for ↖️
-    if (
-      from_idx + 1 - 8 >= 0 &&
-      board[from_idx + 1 - 8] < 0 &&
-      board[from_idx + 1 - 8] != -5
-    ) {
-      legal_moves.push(from_idx + 1 - 8);
-    }
-    // bleh, en passant
-    // bleh, filter for illegal checks
-  } else if (board[from] == 47) {
-    // ...
-  } else {
-    // for now just say no moves are allowed
-    return [];
-  }
-
-  return legal_moves;
-}
-
 function make_move(from, to, board) {
   const from_idx = filerank_to_idx(from);
   const to_idx = filerank_to_idx(to);
@@ -219,6 +157,75 @@ function make_move(from, to, board) {
   // set to piece as from piece and from piece is now empty (0)
   board[to_idx] = board[from_idx];
   board[from_idx] = 0;
+  pretty_print(board);
+}
+
+// checks if "to" square is in list of legal "from" squares
+function is_legal_move(from, to, board) {
+  //   const from_idx = filerank_to_idx(from);
+  const to_idx = filerank_to_idx(to);
+
+  const legal_moves = get_legal_moves(from, board);
+  console.log(legal_moves);
+  return legal_moves.includes(to_idx);
+}
+
+// all the fun move logic 😍
+function get_legal_moves(from, board) {
+  // const file = from[0];
+  // const rank = parseInt(from[1]);
+  const from_idx = filerank_to_idx(from);
+
+  // white pawn moves
+  if (Math.abs(board[from_idx]) == 1) {
+    return get_legal_pawn_moves(from, board);
+  } else {
+    // for now just say no moves are allowed
+    return [];
+  }
+}
+
+function get_legal_pawn_moves(from, board) {
+  const from_idx = filerank_to_idx(from);
+  const rank = parseInt(from[1]);
+  const legal_moves = [];
+
+  const color = board[from_idx] < 0 ? -1 : 1;
+
+  // if up one is in play and unoccupied
+  let up_one = from_idx - 8 * color;
+  if (
+    board[up_one] == 0 &&
+    ((color == -1 && up_one < 64) || (color == 1 && up_one >= 0))
+  ) {
+    legal_moves.push(up_one);
+  }
+
+  // now same for up two, if on starting rank
+  let up_two = from_idx - 16 * color;
+  if (
+    (board[up_two] == 0) & (board[up_one] == 0) &&
+    ((color == -1 && rank == 7 && up_two >= 0) ||
+      (color == 1 && rank == 2 && up_two < 64))
+  ) {
+    legal_moves.push(up_two);
+  }
+
+  // now check possible capturing squares
+  // if ↗️ is in play and occupied by an opposite-color non-king piece, we can take
+  const diag_moves = [from_idx - 1 - 8 * color, from_idx + 1 - 8 * color];
+  diag_moves.forEach((move) => {
+    if (
+      (color == -1 && move < 64 && board[move] > 0) ||
+      (color == 1 && move >= 0 && board[move] < 0)
+    ) {
+      legal_moves.push(move);
+    }
+  });
+
+  // bleh, en passant
+  // bleh, filter for illegal checks
+  return legal_moves;
 }
 
 function pretty_print(board) {
@@ -240,27 +247,15 @@ function pretty_print(board) {
 }
 
 // fix pieces on window resize
-// let window_width = window.innerWidth;
-// let window_height = window.innerHeight;
+let left = $("#a6").position().left;
+function resize() {
+  const d_left = left - $("#a6").position().left;
+  $(".piece").each(function () {
+    $(this).css("left", $(this).position().left - d_left + "px");
+    // call dragElement again so
+    dragElement(document.getElementById($(this).attr("id")));
+  });
+  left = $("#a6").position().left;
+}
 
-// function reportWindowSize() {
-//   let diff_x = window_width - window.innerWidth;
-//   let diff_y = window_height - window.innerHeight;
-//   window_width = window.innerWidth;
-//   window_height = window.innerHeight;
-
-//   console.log(window.innerWidth);
-
-//   $(".piece").each(function () {
-//     console.log(parseInt($(this).css("top")));
-//     // console.log($(this));
-//     $(this).css("top", parseInt($(this).css("top")) - diff_y + "px");
-//     $(this).css("left", parseInt($(this).css("left")) - diff_x + "px");
-//   });
-// }
-
-// window.onresize = reportWindowSize;
-
-// $("#a1").on("resize", function () {
-//   console.log("ghekllo");
-// });
+window.onresize = resize;
