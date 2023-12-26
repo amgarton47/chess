@@ -1,0 +1,44 @@
+:root {
+    --row_width: 90px;
+    --col_width: 90px;
+
+    --light_color: #e9edcc;
+    --dark_color: #779954;
+  }
+
+#board{
+    padding: 0px;
+    width: auto;
+    height: auto;
+    display: grid;
+    grid-template-rows: var(--row_width) var(--row_width) var(--row_width) var(--row_width) var(--row_width) var(--row_width) var(--row_width) 100px;
+    grid-template-columns: var(--col_width) var(--col_width) var(--col_width) var(--col_width) var(--col_width) var(--col_width) var(--col_width) var(--col_width);
+
+    margin: auto;
+    width: 50%;
+}
+
+.square:hover{
+    /* border: 1px solid black; */
+    /* width: 100px; */
+    /* background-color: purple; */
+}
+
+.dark {
+    background-color: var(--dark_color);
+    color: white;
+}
+
+.light {
+    background-color: var(--light_color);
+    color: black;
+}
+
+.piece {
+    height: 70px;
+    position: absolute;
+}
+
+.active {
+    z-index: 100;
+}
