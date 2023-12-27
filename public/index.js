@@ -36,9 +36,11 @@ for (let i = 0; i < board.length; i++) {
     const pos = square.getBoundingClientRect();
 
     $("body").append(
-      `<img id="${file}${rank}_${piece_color}_${piece_name}" src="${piece_img}" class="piece" style="top:${
-        pos.top + 1.75 + "px"
-      }; left:${pos.left + 1.75 + "px"};">`
+      `<img id="${
+        file + rank
+      }_${piece_color}_${piece_name}" src="${piece_img}" class="piece ${
+        file + rank
+      }" style="top:${pos.top + 1.75 + "px"}; left:${pos.left + 1.75 + "px"};">`
     );
 
     dragElement(
@@ -46,6 +48,20 @@ for (let i = 0; i < board.length; i++) {
     );
   }
 }
+
+// move pieces on window resize
+let left = $("#a6").position().left;
+function resize() {
+  const d_left = left - $("#a6").position().left;
+  $(".piece").each(function () {
+    $(this).css("left", $(this).position().left - d_left + "px");
+    // call dragElement again so
+    dragElement(document.getElementById($(this).attr("id")));
+  });
+  left = $("#a6").position().left;
+}
+
+window.onresize = resize;
 
 // make pieces draggable
 function dragElement(elt) {
@@ -130,6 +146,14 @@ function dragElement(elt) {
       // make move on array board
       make_move(start_square, current_square.id, board);
 
+      // change piece's square class
+      elt.classList.forEach((class_name) => {
+        if (/[abcdefgh][12345678]/.test(class_name)) {
+          elt.classList.remove(class_name);
+        }
+      });
+      elt.classList.add(current_square.id);
+
       // set start square as new square
       start_square = current_square.id;
     }
@@ -143,16 +167,14 @@ function dragElement(elt) {
   }
 }
 
-// converts [file][rank] notation to the corresponding index in the board array
-function filerank_to_idx(filerank) {
-  const file = filerank[0];
-  const rank = parseInt(filerank[1]);
-  return 8 * (8 - rank) + "abcdefgh".indexOf(file);
-}
-
 function make_move(from, to, board) {
   const from_idx = filerank_to_idx(from);
   const to_idx = filerank_to_idx(to);
+
+  // if move is a capture, remove captured piece
+  if (board[to_idx] != 0) {
+    $(`.${to}`)[0].remove();
+  }
 
   // set to piece as from piece and from piece is now empty (0)
   board[to_idx] = board[from_idx];
@@ -172,15 +194,20 @@ function is_legal_move(from, to, board) {
 
 // all the fun move logic 😍
 function get_legal_moves(from, board) {
-  // const file = from[0];
-  // const rank = parseInt(from[1]);
   const from_idx = filerank_to_idx(from);
+  const piece_type = Math.abs(board[from_idx]);
 
-  // white pawn moves
-  if (Math.abs(board[from_idx]) == 1) {
+  if (piece_type == 1) {
     return get_legal_pawn_moves(from, board);
-  } else {
-    // for now just say no moves are allowed
+  } else if (piece_type == 2) {
+    return get_legal_bishop_moves(from, board);
+  } else if (piece_type == 3) {
+    return [];
+  } else if (piece_type == 4) {
+    return [];
+  } else if (piece_type == 5) {
+    return [];
+  } else if (piece_type == 6) {
     return [];
   }
 }
@@ -189,7 +216,6 @@ function get_legal_pawn_moves(from, board) {
   const from_idx = filerank_to_idx(from);
   const rank = parseInt(from[1]);
   const legal_moves = [];
-
   const color = board[from_idx] < 0 ? -1 : 1;
 
   // if up one is in play and unoccupied
@@ -228,6 +254,34 @@ function get_legal_pawn_moves(from, board) {
   return legal_moves;
 }
 
+function get_legal_bishop_moves(from, board) {
+  const from_idx = filerank_to_idx(from);
+  const legal_moves = [];
+
+  //                   ↗️, ↙️, ↖️, ↘️
+  const directions = [-7, 7, -9, 9];
+  while (directions.length > 0) {
+    const curr_dir = directions.pop();
+    let candidate = from_idx + curr_dir;
+    let stop = false;
+
+    while (candidate < 64 && candidate >= 0 && !stop) {
+      if (is_opposite_color(from_idx, candidate, board)) {
+        legal_moves.push(candidate);
+        stop = true;
+      } else if (is_same_color(from_idx, candidate, board)) {
+        stop = true;
+      } else {
+        legal_moves.push(candidate);
+        candidate += curr_dir;
+      }
+    }
+  }
+  // bleh, filter for illegal checks
+  return legal_moves;
+}
+
+// HELPER FUNCTIONS
 function pretty_print(board) {
   let print_str = "";
 
@@ -245,17 +299,21 @@ function pretty_print(board) {
 
   console.log(print_str);
 }
+function is_opposite_color(sq1, sq2, board) {
+  const p1 = board[sq1],
+    p2 = board[sq2];
 
-// fix pieces on window resize
-let left = $("#a6").position().left;
-function resize() {
-  const d_left = left - $("#a6").position().left;
-  $(".piece").each(function () {
-    $(this).css("left", $(this).position().left - d_left + "px");
-    // call dragElement again so
-    dragElement(document.getElementById($(this).attr("id")));
-  });
-  left = $("#a6").position().left;
+  return (p1 > 0 && p2 < 0) || (p2 > 0 && p1 < 0);
 }
+function is_same_color(sq1, sq2, board) {
+  const p1 = board[sq1],
+    p2 = board[sq2];
 
-window.onresize = resize;
+  return (p1 > 0 && p2 > 0) || (p1 < 0 && p2 < 0);
+}
+// converts [file][rank] notation to the corresponding index in the board array
+function filerank_to_idx(filerank) {
+  const file = filerank[0];
+  const rank = parseInt(filerank[1]);
+  return 8 * (8 - rank) + "abcdefgh".indexOf(file);
+}
