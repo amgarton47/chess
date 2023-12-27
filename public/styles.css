@@ -24,6 +24,10 @@
   border: 3px solid #dbdbdb;
 }
 
+.legal_move {
+  background-color: aqua !important;
+}
+
 .dark {
   background-color: var(--dark_color);
   color: white;
