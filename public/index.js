@@ -563,6 +563,7 @@ function filter_revealed_checks(from, moves, board) {
 }
 
 // return all squares that are attacked by the opposing pieces
+// REFACTOR THIS
 function get_attacked_squares(color, board) {
 	let attacked = [];
 	for (let i = 0; i < board.length; i++) {
