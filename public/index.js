@@ -214,8 +214,7 @@ function make_move(from, to, board) {
 
 // checks if "to" square is in list of legal "from" squares
 function is_legal_move(from, to, board) {
-	const legal_moves = get_legal_moves(from, board);
-	return legal_moves.includes(to);
+	return get_legal_moves(from, board).includes(to);
 }
 
 // all the fun move logic 😍
@@ -433,6 +432,12 @@ function get_long_attacks(dirs, from_i, from_j, board) {
 				attacked.push(idx_to_filerank(candidate_i, candidate_j));
 				candidate_i += di;
 				candidate_j += dj;
+			} else if (
+				board[candidate_i][candidate_j] * board[from_i][from_j] >=
+				0
+			) {
+				attacked.push(idx_to_filerank(candidate_i, candidate_j));
+				stop = true;
 			} else {
 				stop = true;
 			}
@@ -483,6 +488,43 @@ function get_rook_attacking_squares(from, board) {
 	];
 
 	return get_long_attacks(dirs, from_i, from_j, board);
+}
+
+function get_knight_attacking_squares(from, board) {
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
+	const attacking = [];
+
+	const dirs = [
+		[-2, -1],
+		[-2, 1],
+		[1, -2],
+		[1, 2],
+		[2, 1],
+		[2, -1],
+		[-1, -2],
+		[-1, 2],
+	];
+
+	dirs.forEach((dir) => {
+		const di = dir[0];
+		const dj = dir[1];
+		let candidate_i = from_i + di;
+		let candidate_j = from_j + dj;
+		let stop = false;
+
+		if (
+			!stop &&
+			candidate_i <= 7 &&
+			candidate_i >= 0 &&
+			candidate_j <= 7 &&
+			candidate_j >= 0
+		) {
+			attacking.push(idx_to_filerank(candidate_i, candidate_j));
+		}
+	});
+
+	return attacking;
 }
 
 function get_king_square(color, board) {
@@ -548,7 +590,7 @@ function get_attacked_squares(color, board) {
 
 				if (Math.abs(board[i][j]) == 3) {
 					attacked = attacked.concat(
-						get_legal_knight_moves(from, board)
+						get_knight_attacking_squares(from, board)
 					);
 				}
 
