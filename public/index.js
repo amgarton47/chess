@@ -546,11 +546,7 @@ function get_attacked_squares(color, board) {
 			} else if (board[i][j] * color < 0 && Math.abs(board[i][j]) != 5) {
 				const from = idx_to_filerank(i, j);
 
-				if (Math.abs(board[i][j]) == 1) {
-					attacked = attacked.concat(
-						get_legal_pawn_moves(from, board)
-					);
-				} else if (Math.abs(board[i][j]) == 3) {
+				if (Math.abs(board[i][j]) == 3) {
 					attacked = attacked.concat(
 						get_legal_knight_moves(from, board)
 					);
