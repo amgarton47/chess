@@ -99,7 +99,8 @@ function dragElement(elt) {
 
 		const legal_moves = get_legal_moves(start_square, board);
 		legal_moves.forEach((m) => {
-			[i, j] = file_rank_to_idx(m);
+			const i = file_rank_to_idx(m)[0];
+			const j = file_rank_to_idx(m)[1];
 			const class_name =
 				board[i][j] != 0 ? "legal_move_capture" : "legal_move";
 
@@ -209,7 +210,6 @@ function make_move(from, to, board) {
 	// set to piece as from piece and from piece is now empty (0)
 	board[to_i][to_j] = board[from_i][from_j];
 	board[from_i][from_j] = 0;
-	pretty_print(board);
 }
 
 // checks if "to" square is in list of legal "from" squares
@@ -220,28 +220,51 @@ function is_legal_move(from, to, board) {
 
 // all the fun move logic 😍
 function get_legal_moves(from, board) {
-	[from_i, from_j] = file_rank_to_idx(from);
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
 
 	const piece_type = Math.abs(board[from_i][from_j]);
 
 	if (piece_type == 1) {
-		return get_legal_pawn_moves(from, board);
+		return filter_revealed_checks(
+			from,
+			get_legal_pawn_moves(from, board),
+			board
+		);
 	} else if (piece_type == 2) {
-		return get_legal_bishop_moves(from, board);
+		return filter_revealed_checks(
+			from,
+			get_legal_bishop_moves(from, board),
+			board
+		);
 	} else if (piece_type == 3) {
-		return get_legal_knight_moves(from, board);
+		return filter_revealed_checks(
+			from,
+			get_legal_knight_moves(from, board),
+			board
+		);
 	} else if (piece_type == 4) {
-		return get_legal_rook_moves(from, board);
+		return filter_revealed_checks(
+			from,
+			get_legal_rook_moves(from, board),
+			board
+		);
 	} else if (piece_type == 5) {
 		return get_legal_king_moves(from, board);
 	} else if (piece_type == 6) {
-		return get_legal_queen_moves(from, board);
+		return filter_revealed_checks(
+			from,
+			get_legal_queen_moves(from, board),
+			board
+		);
 	}
 }
 
+// #region MOVE LOGIC
 function get_legal_pawn_moves(from, board) {
 	const rank = parseInt(from[1]);
-	[from_i, from_j] = file_rank_to_idx(from);
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
 
 	const legal_moves = [];
 	const color = board[from_i][from_j] < 0 ? -1 : 1;
@@ -289,7 +312,8 @@ function get_legal_pawn_moves(from, board) {
 }
 
 function get_legal_bishop_moves(from, board) {
-	[from_i, from_j] = file_rank_to_idx(from);
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
 	const dirs = [
 		[-1, -1],
 		[-1, 1],
@@ -300,7 +324,8 @@ function get_legal_bishop_moves(from, board) {
 }
 
 function get_legal_knight_moves(from, board) {
-	[from_i, from_j] = file_rank_to_idx(from);
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
 	const legal_moves = [];
 
 	const dirs = [
@@ -318,7 +343,8 @@ function get_legal_knight_moves(from, board) {
 }
 
 function get_legal_rook_moves(from, board) {
-	[from_i, from_j] = file_rank_to_idx(from);
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
 
 	const dirs = [
 		[1, 0],
@@ -331,7 +357,8 @@ function get_legal_rook_moves(from, board) {
 }
 
 function get_legal_queen_moves(from, board) {
-	[from_i, from_j] = file_rank_to_idx(from);
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
 
 	const dirs = [
 		[1, 0],
@@ -347,14 +374,188 @@ function get_legal_queen_moves(from, board) {
 	return get_long_moves(dirs, from_i, from_j, board);
 }
 
+function get_legal_king_moves(from, board) {
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
+
+	const dirs = [
+		[1, 0],
+		[0, 1],
+		[-1, 0],
+		[0, -1],
+		[1, 1],
+		[-1, -1],
+		[1, -1],
+		[-1, 1],
+	];
+
+	const legal_moves = get_short_moves(dirs, from_i, from_j, board);
+
+	// remove "legal moves" that are attacked by enemy pieces (i.e that would put the king in check)
+	const color = board[from_i][from_j] < 0 ? -1 : 1;
+	const attacked_squares = get_attacked_squares(color, board);
+
+	return legal_moves.filter((elt) => !attacked_squares.includes(elt));
+}
+
+function get_long_attacks(dirs, from_i, from_j, board) {
+	const attacked = [];
+	dirs.forEach((dir) => {
+		let stop = false;
+		const di = dir[0];
+		const dj = dir[1];
+		let candidate_i = from_i + di;
+		let candidate_j = from_j + dj;
+
+		while (
+			!stop &&
+			candidate_i <= 7 &&
+			candidate_j <= 7 &&
+			candidate_i >= 0 &&
+			candidate_j >= 0
+		) {
+			if (board[candidate_i][candidate_j] == 0) {
+				attacked.push(idx_to_filerank(candidate_i, candidate_j));
+				candidate_i += di;
+				candidate_j += dj;
+			} else if (
+				board[candidate_i][candidate_j] * board[from_i][from_j] <= 0 &&
+				Math.abs(board[candidate_i][candidate_j]) != 5
+			) {
+				attacked.push(idx_to_filerank(candidate_i, candidate_j));
+				candidate_i += di;
+				candidate_j += dj;
+				stop = true;
+			} else if (
+				board[candidate_i][candidate_j] * board[from_i][from_j] <= 0 &&
+				Math.abs(board[candidate_i][candidate_j]) == 5
+			) {
+				attacked.push(idx_to_filerank(candidate_i, candidate_j));
+				candidate_i += di;
+				candidate_j += dj;
+			} else {
+				stop = true;
+			}
+		}
+	});
+	return attacked;
+}
+
+function get_queen_attacking_squares(from, board) {
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
+
+	const dirs = [
+		[1, 0],
+		[0, 1],
+		[-1, 0],
+		[0, -1],
+		[1, 1],
+		[-1, -1],
+		[1, -1],
+		[-1, 1],
+	];
+
+	return get_long_attacks(dirs, from_i, from_j, board);
+}
+
+function get_bishop_attacking_squares(from, board) {
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
+	const dirs = [
+		[-1, -1],
+		[-1, 1],
+		[1, -1],
+		[1, 1],
+	];
+	return get_long_attacks(dirs, from_i, from_j, board);
+}
+
+function get_rook_attacking_squares(from, board) {
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
+
+	const dirs = [
+		[1, 0],
+		[0, 1],
+		[-1, 0],
+		[0, -1],
+	];
+
+	return get_long_attacks(dirs, from_i, from_j, board);
+}
+
+function get_king_square(color, board) {
+	for (let i = 0; i < board.length; i++) {
+		for (let j = 0; j < board[0].length; j++) {
+			if (board[i][j] * color == 5) {
+				return idx_to_filerank(i, j);
+			}
+		}
+	}
+}
+
+function filter_revealed_checks(from, moves, board) {
+	let from_i = file_rank_to_idx(from)[0];
+	let from_j = file_rank_to_idx(from)[1];
+
+	const color = board[from_i][from_j] > 0 ? 1 : -1;
+	const to_remove = [];
+
+	moves.forEach((m) => {
+		const b = JSON.parse(JSON.stringify(board));
+		const to_i = file_rank_to_idx(m)[0];
+		const to_j = file_rank_to_idx(m)[1];
+
+		b[to_i][to_j] = b[from_i][from_j];
+		b[from_i][from_j] = 0;
+
+		const attacked = get_attacked_squares(color, b);
+
+		if (attacked.includes(get_king_square(color, b))) {
+			pretty_print(b);
+			to_remove.push(m);
+		}
+	});
+
+	return moves.filter((m) => !to_remove.includes(m));
+}
+
 // return all squares that are attacked by the opposing pieces
 function get_attacked_squares(color, board) {
 	let attacked = [];
 	for (let i = 0; i < board.length; i++) {
 		for (let j = 0; j < board[0].length; j++) {
-			if (board[i][j] * color < 0 && board[i][j] != -5) {
+			if (
+				board[i][j] * color < 0 &&
+				[6, 4, 2].includes(Math.abs(board[i][j]))
+			) {
 				const from = idx_to_filerank(i, j);
-				attacked = attacked.concat(get_legal_moves(from, board));
+				if (Math.abs(board[i][j]) == 2) {
+					attacked = attacked.concat(
+						get_bishop_attacking_squares(from, board)
+					);
+				} else if (Math.abs(board[i][j]) == 4) {
+					attacked = attacked.concat(
+						get_rook_attacking_squares(from, board)
+					);
+				} else {
+					attacked = attacked.concat(
+						get_queen_attacking_squares(from, board)
+					);
+				}
+			} else if (board[i][j] * color < 0 && Math.abs(board[i][j]) != 5) {
+				const from = idx_to_filerank(i, j);
+
+				if (Math.abs(board[i][j]) == 1) {
+					attacked = attacked.concat(
+						get_legal_pawn_moves(from, board)
+					);
+				} else if (Math.abs(board[i][j]) == 3) {
+					attacked = attacked.concat(
+						get_legal_knight_moves(from, board)
+					);
+				}
 
 				// special case for diagonals of pawns since they are not legal moves in this situation
 				if (Math.abs(board[i][j]) == 1) {
@@ -375,41 +576,13 @@ function get_attacked_squares(color, board) {
 	return attacked;
 }
 
-function get_legal_king_moves(from, board) {
-	[from_i, from_j] = file_rank_to_idx(from);
-
-	const dirs = [
-		[1, 0],
-		[0, 1],
-		[-1, 0],
-		[0, -1],
-		[1, 1],
-		[-1, -1],
-		[1, -1],
-		[-1, 1],
-	];
-
-	const legal_moves = get_short_moves(dirs, from_i, from_j, board);
-
-	// remove "legal moves" that are attacked by enemy pieces (i.e that would put the king in check)
-	const color = board[from_i][from_j] < 0 ? -1 : 1;
-	const attacked_squares = get_attacked_squares(color, board);
-
-	for (let i = 0; i < legal_moves.length; i++) {
-		if (attacked_squares.includes(legal_moves[i])) {
-			legal_moves.splice(i, 1);
-		}
-	}
-
-	return legal_moves;
-}
-
 // is used to find legal moves for queen, biship, rook (i.e. pieces that can move long range)
 function get_long_moves(dirs, from_i, from_j, board) {
 	const legal_moves = [];
 	dirs.forEach((dir) => {
 		let stop = false;
-		[di, dj] = dir;
+		const di = dir[0];
+		const dj = dir[1];
 		let candidate_i = from_i + di;
 		let candidate_j = from_j + dj;
 
@@ -442,7 +615,8 @@ function get_long_moves(dirs, from_i, from_j, board) {
 function get_short_moves(dirs, from_i, from_j, board) {
 	const legal_moves = [];
 	dirs.forEach((dir) => {
-		[di, dj] = dir;
+		const di = dir[0];
+		const dj = dir[1];
 		let candidate_i = from_i + di;
 		let candidate_j = from_j + dj;
 		let stop = false;
@@ -461,12 +635,7 @@ function get_short_moves(dirs, from_i, from_j, board) {
 
 	return legal_moves;
 }
-
-// determine if a piece is blocking the king from being in check
-// function is_blocking_check(from_i, from_j, board) {
-// 	const king_i = 4;
-// 	const king_j = 7;
-// }
+// #endregion
 
 //#region HELPER FUNCTIONS
 function pretty_print(board) {
