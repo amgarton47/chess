@@ -15,9 +15,11 @@
 	grid-template-columns:
 		var(--col_width) var(--col_width) var(--col_width) var(--col_width)
 		var(--col_width) var(--col_width) var(--col_width) var(--col_width);
+	margin-left: 25%;
+}
 
-	margin: auto;
-	width: 50%;
+#board_container {
+	display: flex;
 }
 
 .square_hover {

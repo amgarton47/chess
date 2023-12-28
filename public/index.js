@@ -20,6 +20,8 @@ const board = [
 	[4, 3, 2, 6, 5, 2, 3, 4],
 ];
 
+let whose_turn = 1; // 1: white, -1: black
+
 // create board and pieces according to starting board ^
 for (let i = 0; i < board.length; i++) {
 	for (let j = 0; j < board[0].length; j++) {
@@ -48,7 +50,7 @@ for (let i = 0; i < board.length; i++) {
 					file + rank
 				}" style="top:${pos.top + 2.5 + "px"}; left:${
 					pos.left + 2.5 + "px"
-				};">`
+				};" draggable="false">`
 			);
 
 			dragElement(
@@ -87,6 +89,7 @@ function dragElement(elt) {
 	var startx = parseFloat(elt.style.top);
 	var starty = parseFloat(elt.style.left);
 	let start_square = null;
+	let piece_color;
 
 	function dragMouseDown(e) {
 		if (!start_square) {
@@ -94,6 +97,10 @@ function dragElement(elt) {
 				.elementsFromPoint(e.clientX, e.clientY)
 				.find((elt) => elt.classList.contains("square")).id;
 		}
+
+		// get color of piece trying to be moved
+		const piece_id = $(`.${start_square}`)[0].id;
+		piece_color = piece_id.indexOf("white") > -1 ? 1 : -1;
 
 		elt.classList.add("active");
 
@@ -155,8 +162,10 @@ function dragElement(elt) {
 
 		if (
 			current_square &&
-			is_legal_move(start_square, current_square.id, board)
+			is_legal_move(start_square, current_square.id, board) &&
+			piece_color * whose_turn > 0
 		) {
+			whose_turn *= -1;
 			// snap piece to center of square
 			const position = document
 				.getElementById(current_square.id)
@@ -177,6 +186,27 @@ function dragElement(elt) {
 
 			// set start square as new square
 			start_square = current_square.id;
+
+			// check if game is over
+			let legal_moves = [];
+			for (let i = 0; i < board.length; i++) {
+				for (let j = 0; j < board[0].length; j++) {
+					if (board[i][j] * whose_turn > 0) {
+						legal_moves = legal_moves.concat(
+							get_legal_moves(idx_to_filerank(i, j), board)
+						);
+					}
+				}
+			}
+
+			if (legal_moves.length == 0) {
+				Array.from(document.getElementsByClassName("piece")).forEach(
+					(e) => (e.onmousedown = () => {})
+				);
+				alert(
+					`Checkmate. ${whose_turn == 1 ? "Black" : "White"} wins!`
+				);
+			}
 		}
 		// return to orig location if invalid new location
 		elt.style.top = startx + "px";
