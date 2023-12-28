@@ -513,7 +513,6 @@ function filter_revealed_checks(from, moves, board) {
 		const attacked = get_attacked_squares(color, b);
 
 		if (attacked.includes(get_king_square(color, b))) {
-			pretty_print(b);
 			to_remove.push(m);
 		}
 	});
