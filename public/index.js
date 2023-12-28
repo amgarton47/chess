@@ -215,20 +215,12 @@ function make_move(from, to, board) {
 // checks if "to" square is in list of legal "from" squares
 function is_legal_move(from, to, board) {
 	const legal_moves = get_legal_moves(from, board);
-	console.log(legal_moves);
 	return legal_moves.includes(to);
 }
 
 // all the fun move logic 😍
 function get_legal_moves(from, board) {
-	// return [];
-	// const from_idx = filerank_to_idx(from);
-
-	const rank = parseInt(from[1]);
-	const file = from[0];
-
-	const from_i = 7 - rank + 1;
-	const from_j = "abcdefgh".indexOf(file);
+	[from_i, from_j] = file_rank_to_idx(from);
 
 	const piece_type = Math.abs(board[from_i][from_j]);
 
@@ -355,9 +347,36 @@ function get_legal_queen_moves(from, board) {
 	return get_long_moves(dirs, from_i, from_j, board);
 }
 
+// return all squares that are attacked by the opposing pieces
+function get_attacked_squares(color, board) {
+	let attacked = [];
+	for (let i = 0; i < board.length; i++) {
+		for (let j = 0; j < board[0].length; j++) {
+			if (board[i][j] * color < 0 && board[i][j] != -5) {
+				const from = idx_to_filerank(i, j);
+				attacked = attacked.concat(get_legal_moves(from, board));
+
+				// special case for diagonals of pawns since they are not legal moves in this situation
+				if (Math.abs(board[i][j]) == 1) {
+					if (i + color <= 7 && i + color >= 0) {
+						if (j + 1 <= 7) {
+							attacked.push(idx_to_filerank(i + color, j + 1));
+						}
+
+						if (j - 1 >= 0) {
+							attacked.push(idx_to_filerank(i + color, j - 1));
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return attacked;
+}
+
 function get_legal_king_moves(from, board) {
 	[from_i, from_j] = file_rank_to_idx(from);
-	const legal_moves = [];
 
 	const dirs = [
 		[1, 0],
@@ -370,7 +389,19 @@ function get_legal_king_moves(from, board) {
 		[-1, 1],
 	];
 
-	return get_short_moves(dirs, from_i, from_j, board);
+	const legal_moves = get_short_moves(dirs, from_i, from_j, board);
+
+	// remove "legal moves" that are attacked by enemy pieces (i.e that would put the king in check)
+	const color = board[from_i][from_j] < 0 ? -1 : 1;
+	const attacked_squares = get_attacked_squares(color, board);
+
+	for (let i = 0; i < legal_moves.length; i++) {
+		if (attacked_squares.includes(legal_moves[i])) {
+			legal_moves.splice(i, 1);
+		}
+	}
+
+	return legal_moves;
 }
 
 // is used to find legal moves for queen, biship, rook (i.e. pieces that can move long range)
@@ -430,6 +461,12 @@ function get_short_moves(dirs, from_i, from_j, board) {
 
 	return legal_moves;
 }
+
+// determine if a piece is blocking the king from being in check
+// function is_blocking_check(from_i, from_j, board) {
+// 	const king_i = 4;
+// 	const king_j = 7;
+// }
 
 //#region HELPER FUNCTIONS
 function pretty_print(board) {
