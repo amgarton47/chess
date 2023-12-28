@@ -46,8 +46,8 @@ for (let i = 0; i < board.length; i++) {
 					file + rank
 				}_${piece_color}_${piece_name}" src="${piece_img}" class="piece ${
 					file + rank
-				}" style="top:${pos.top + 1.75 + "px"}; left:${
-					pos.left + 1.75 + "px"
+				}" style="top:${pos.top + 2.5 + "px"}; left:${
+					pos.left + 2.5 + "px"
 				};">`
 			);
 
@@ -99,7 +99,11 @@ function dragElement(elt) {
 
 		const legal_moves = get_legal_moves(start_square, board);
 		legal_moves.forEach((m) => {
-			$(`#${m}`).addClass("legal_move");
+			[i, j] = file_rank_to_idx(m);
+			const class_name =
+				board[i][j] != 0 ? "legal_move_capture" : "legal_move";
+
+			$(`#${m}`).append(`<div class="${class_name}"></div>`);
 		});
 
 		// snap piece to center of cursor
@@ -156,8 +160,8 @@ function dragElement(elt) {
 			const position = document
 				.getElementById(current_square.id)
 				.getBoundingClientRect();
-			startx = position.top + 1.75;
-			starty = position.left + 1.75;
+			startx = position.top + 2.5;
+			starty = position.left + 2.5;
 
 			// make move on array board
 			make_move(start_square, current_square.id, board);
@@ -177,7 +181,8 @@ function dragElement(elt) {
 		elt.style.top = startx + "px";
 		elt.style.left = starty + "px";
 
-		$(".square").removeClass("legal_move");
+		$(".square .legal_move").remove();
+		$(".square .legal_move_capture").remove();
 
 		// stop moving when mouse is released:
 		document.onmouseup = null;
@@ -232,22 +237,19 @@ function get_legal_moves(from, board) {
 	} else if (piece_type == 2) {
 		return get_legal_bishop_moves(from, board);
 	} else if (piece_type == 3) {
-		return [];
+		return get_legal_knight_moves(from, board);
 	} else if (piece_type == 4) {
-		return [];
+		return get_legal_rook_moves(from, board);
 	} else if (piece_type == 5) {
-		return [];
+		return get_legal_king_moves(from, board);
 	} else if (piece_type == 6) {
-		return [];
+		return get_legal_queen_moves(from, board);
 	}
 }
 
 function get_legal_pawn_moves(from, board) {
 	const rank = parseInt(from[1]);
-	const file = from[0];
-
-	const from_i = 7 - rank + 1;
-	const from_j = "abcdefgh".indexOf(file);
+	[from_i, from_j] = file_rank_to_idx(from);
 
 	const legal_moves = [];
 	const color = board[from_i][from_j] < 0 ? -1 : 1;
@@ -264,7 +266,10 @@ function get_legal_pawn_moves(from, board) {
 		legal_moves.push(idx_to_filerank(candidate_i, candidate_j));
 
 		// now same for up two, if on starting rank
-		if ((color == -1 && rank == 7) || (color == 1 && rank == 2)) {
+		if (
+			((color == -1 && rank == 7) || (color == 1 && rank == 2)) &&
+			board[candidate_i - color][candidate_j] == 0
+		) {
 			legal_moves.push(idx_to_filerank(candidate_i - color, candidate_j));
 		}
 	}
@@ -275,8 +280,6 @@ function get_legal_pawn_moves(from, board) {
 	const diag_moves = [from_j + 1, from_j - 1];
 
 	diag_moves.forEach((j) => {
-		console.log(candidate_i, j, idx_to_filerank(candidate_i, j));
-
 		if (
 			j >= 0 &&
 			j <= 7 &&
@@ -294,7 +297,137 @@ function get_legal_pawn_moves(from, board) {
 }
 
 function get_legal_bishop_moves(from, board) {
+	[from_i, from_j] = file_rank_to_idx(from);
+	const dirs = [
+		[-1, -1],
+		[-1, 1],
+		[1, -1],
+		[1, 1],
+	];
+	return get_long_moves(dirs, from_i, from_j, board);
+}
+
+function get_legal_knight_moves(from, board) {
+	[from_i, from_j] = file_rank_to_idx(from);
 	const legal_moves = [];
+
+	const dirs = [
+		[-2, -1],
+		[-2, 1],
+		[1, -2],
+		[1, 2],
+		[2, 1],
+		[2, -1],
+		[-1, -2],
+		[-1, 2],
+	];
+
+	return get_short_moves(dirs, from_i, from_j, board);
+}
+
+function get_legal_rook_moves(from, board) {
+	[from_i, from_j] = file_rank_to_idx(from);
+
+	const dirs = [
+		[1, 0],
+		[0, 1],
+		[-1, 0],
+		[0, -1],
+	];
+
+	return get_long_moves(dirs, from_i, from_j, board);
+}
+
+function get_legal_queen_moves(from, board) {
+	[from_i, from_j] = file_rank_to_idx(from);
+
+	const dirs = [
+		[1, 0],
+		[0, 1],
+		[-1, 0],
+		[0, -1],
+		[1, 1],
+		[-1, -1],
+		[1, -1],
+		[-1, 1],
+	];
+
+	return get_long_moves(dirs, from_i, from_j, board);
+}
+
+function get_legal_king_moves(from, board) {
+	[from_i, from_j] = file_rank_to_idx(from);
+	const legal_moves = [];
+
+	const dirs = [
+		[1, 0],
+		[0, 1],
+		[-1, 0],
+		[0, -1],
+		[1, 1],
+		[-1, -1],
+		[1, -1],
+		[-1, 1],
+	];
+
+	return get_short_moves(dirs, from_i, from_j, board);
+}
+
+// is used to find legal moves for queen, biship, rook (i.e. pieces that can move long range)
+function get_long_moves(dirs, from_i, from_j, board) {
+	const legal_moves = [];
+	dirs.forEach((dir) => {
+		let stop = false;
+		[di, dj] = dir;
+		let candidate_i = from_i + di;
+		let candidate_j = from_j + dj;
+
+		while (
+			!stop &&
+			candidate_i <= 7 &&
+			candidate_j <= 7 &&
+			candidate_i >= 0 &&
+			candidate_j >= 0
+		) {
+			if (board[candidate_i][candidate_j] == 0) {
+				legal_moves.push(idx_to_filerank(candidate_i, candidate_j));
+				candidate_i += di;
+				candidate_j += dj;
+			} else if (
+				board[candidate_i][candidate_j] * board[from_i][from_j] >
+				0
+			) {
+				stop = true;
+			} else {
+				stop = true;
+				legal_moves.push(idx_to_filerank(candidate_i, candidate_j));
+			}
+		}
+	});
+	return legal_moves;
+}
+
+// is used to find legal moves for shor-range moving pieces (the king and the knights)
+function get_short_moves(dirs, from_i, from_j, board) {
+	const legal_moves = [];
+	dirs.forEach((dir) => {
+		[di, dj] = dir;
+		let candidate_i = from_i + di;
+		let candidate_j = from_j + dj;
+		let stop = false;
+
+		if (
+			!stop &&
+			candidate_i <= 7 &&
+			candidate_i >= 0 &&
+			candidate_j <= 7 &&
+			candidate_j >= 0 &&
+			board[candidate_i][candidate_j] * board[from_i][from_j] <= 0
+		) {
+			legal_moves.push(idx_to_filerank(candidate_i, candidate_j));
+		}
+	});
+
 	return legal_moves;
 }
 
@@ -319,9 +452,9 @@ function idx_to_filerank(i, j) {
 	return `${file}${rank}`;
 }
 
-// function filerank_to_idx(filreank) {
-// 	const file = filreank[0];
-// 	const rank = parseInt(filerank[1]);
-// }
-
+function file_rank_to_idx(filerank) {
+	const i = 8 - parseInt(filerank[1]);
+	const j = "abcdefgh".indexOf(filerank[0]);
+	return [i, j];
+}
 //#endregion
