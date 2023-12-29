@@ -21,6 +21,17 @@ const board = [
 ];
 
 let whose_turn = 1; // 1: white, -1: black
+let black_king_has_moved = false;
+let white_king_has_moved = false;
+
+let white_kingside_rook_has_moved = false;
+let white_queenside_rook_has_moved = false;
+
+let black_kingside_rook_has_moved = false;
+let black_queenside_rook_has_moved = false;
+
+let white_king_has_castled = false;
+let black_king_has_castled = false;
 
 // create board and pieces according to starting board ^
 for (let i = 0; i < board.length; i++) {
@@ -162,8 +173,8 @@ function dragElement(elt) {
 
 		if (
 			current_square &&
-			is_legal_move(start_square, current_square.id, board) &&
-			piece_color * whose_turn > 0
+			is_legal_move(start_square, current_square.id, board)
+			// && piece_color * whose_turn > 0
 		) {
 			whose_turn *= -1;
 			// snap piece to center of square
@@ -221,6 +232,53 @@ function dragElement(elt) {
 	}
 }
 
+function do_castle(from, to, board) {
+	const from_i = file_rank_to_idx(from)[0];
+	const from_j = file_rank_to_idx(from)[1];
+
+	const to_i = file_rank_to_idx(to)[0];
+	const to_j = file_rank_to_idx(to)[1];
+
+	const color = board[from_i][from_j] > 0 ? 1 : -1;
+
+	// dynamically get rook start and end position
+	const rook_i = color == -1 ? 0 : 7;
+	const rook_start_j = to_j < 4 ? 0 : 7;
+	const rook_end_j = to_j < 4 ? 3 : 5;
+
+	// make rook and king moves on board representation
+	board[from_i][from_j] = 0;
+	board[to_i][to_j] = 5 * color;
+	board[rook_i][rook_end_j] = 4 * color;
+	board[rook_i][rook_start_j] = 0;
+
+	// move rook to end square on "physical" board
+	const position = document
+		.getElementById(idx_to_filerank(rook_i, rook_end_j))
+		.getBoundingClientRect();
+	let x = position.top + 2.5;
+	let y = position.left + 2.5;
+
+	const elt = document.getElementsByClassName(
+		idx_to_filerank(rook_i, rook_start_j)
+	)[0];
+
+	elt.style.top = x + "px";
+	elt.style.left = y + "px";
+
+	// update rooks square class and call dragElement to reset startx and starty
+	elt.classList.remove(idx_to_filerank(rook_i, rook_start_j));
+	elt.classList.add(idx_to_filerank(rook_i, rook_end_j));
+	dragElement(elt);
+
+	// mark castled as true
+	if (color == -1) {
+		black_king_has_castled = true;
+	} else {
+		white_king_has_castled = true;
+	}
+}
+
 function make_move(from, to, board) {
 	const from_rank = parseInt(from[1]);
 	const from_file = from[0];
@@ -237,9 +295,77 @@ function make_move(from, to, board) {
 		$(`.${to}`)[0].remove();
 	}
 
-	// set to piece as from piece and from piece is now empty (0)
-	board[to_i][to_j] = board[from_i][from_j];
-	board[from_i][from_j] = 0;
+	// mark if king or rook has moved for castling purposes
+	if (!white_king_has_moved && board[from_i][from_j] == 5) {
+		white_king_has_moved = true;
+	}
+
+	if (!black_king_has_moved && board[from_i][from_j] == -5) {
+		black_king_has_moved = true;
+	}
+
+	if (
+		board[from_i][from_j] == 4 &&
+		from_j == 0 &&
+		!white_queenside_rook_has_moved
+	) {
+		white_queenside_rook_has_moved = true;
+	}
+
+	if (
+		board[from_i][from_j] == 4 &&
+		from_j == 7 &&
+		!white_kingside_rook_has_moved
+	) {
+		white_kingside_rook_has_moved = true;
+	}
+
+	if (
+		board[from_i][from_j] == -4 &&
+		from_j == 0 &&
+		!black_queenside_rook_has_moved
+	) {
+		black_queenside_rook_has_moved = true;
+	}
+
+	if (
+		board[from_i][from_j] == 4 &&
+		from_j == 7 &&
+		!black_kingside_rook_has_moved
+	) {
+		black_kingside_rook_has_moved = true;
+	}
+
+	// if castling
+	if (
+		(Math.abs(board[from_i][from_j]) == 5 &&
+			!white_king_has_castled &&
+			(to == "g1" || to == "c1")) ||
+		(!black_king_has_castled && (to == "g8" || to == "c8"))
+	) {
+		do_castle(from, to, board);
+	} else {
+		// else reg move
+		// set to piece as from piece and from piece is now empty (0)
+		board[to_i][to_j] = board[from_i][from_j];
+		board[from_i][from_j] = 0;
+
+		// pawns promote to queens if they reach opposite last rank
+		if (board[to_i][to_j] == 1 && to_rank == 8) {
+			board[to_i][to_j] = 6;
+			console.log($(`.${idx_to_filerank(from_i, from_j)}`)[0]);
+			$(`.${idx_to_filerank(from_i, from_j)}`)
+				.first()
+				.attr("src", "pieces/white_queen.png");
+		}
+
+		if (board[to_i][to_j] == -1 && to_rank == 1) {
+			board[to_i][to_j] = -6;
+			$(`.${idx_to_filerank(from_i, from_j)}`)
+				.first()
+				.attr("src", "pieces/black_queen.png");
+		}
+	}
 }
 
 // checks if "to" square is in list of legal "from" squares
@@ -423,8 +549,63 @@ function get_legal_king_moves(from, board) {
 	// remove "legal moves" that are attacked by enemy pieces (i.e that would put the king in check)
 	const color = board[from_i][from_j] < 0 ? -1 : 1;
 	const attacked_squares = get_attacked_squares(color, board);
+	const filtered = legal_moves.filter(
+		(elt) => !attacked_squares.includes(elt)
+	);
 
-	return legal_moves.filter((elt) => !attacked_squares.includes(elt));
+	// now check castling
+
+	if (
+		board[from_i][from_j] == 5 &&
+		!(white_king_has_moved || white_kingside_rook_has_moved) &&
+		board[7][5] == 0 &&
+		board[7][6] == 0 &&
+		!attacked_squares.includes("f1") &&
+		!attacked_squares.includes("g1") &&
+		!attacked_squares.includes("e1")
+	) {
+		filtered.push("g1");
+	}
+
+	if (
+		board[from_i][from_j] == 5 &&
+		!(white_king_has_moved || white_queenside_rook_has_moved) &&
+		board[7][1] == 0 &&
+		board[7][2] == 0 &&
+		board[7][3] == 0 &&
+		!attacked_squares.includes("e1") &&
+		!attacked_squares.includes("d1") &&
+		!attacked_squares.includes("c1")
+	) {
+		filtered.push("c1");
+	}
+
+	if (
+		board[from_i][from_j] == -5 &&
+		!(black_king_has_moved || black_kingside_rook_has_moved) &&
+		board[0][5] == 0 &&
+		board[0][6] == 0 &&
+		!attacked_squares.includes("f8") &&
+		!attacked_squares.includes("g8") &&
+		!attacked_squares.includes("e8")
+	) {
+		filtered.push("g8");
+	}
+
+	if (
+		board[from_i][from_j] == -5 &&
+		!(black_king_has_moved || black_queenside_rook_has_moved) &&
+		board[0][1] == 0 &&
+		board[0][2] == 0 &&
+		board[0][3] == 0 &&
+		!attacked_squares.includes("e8") &&
+		!attacked_squares.includes("d8") &&
+		!attacked_squares.includes("c8")
+	) {
+		filtered.push("c8");
+	}
+
+	return filtered;
 }
 
 function get_long_attacks(dirs, from_i, from_j, board) {
