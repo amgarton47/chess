@@ -20,18 +20,32 @@ const board = [
 	[4, 3, 2, 6, 5, 2, 3, 4],
 ];
 
-let whose_turn = 1; // 1: white, -1: black
-let black_king_has_moved = false;
-let white_king_has_moved = false;
+var whose_turn = 1; // 1: white, -1: black
 
-let white_kingside_rook_has_moved = false;
-let white_queenside_rook_has_moved = false;
+// keep track for castling purposes
+var black_king_has_moved =
+	(white_king_has_moved =
+	white_kingside_rook_has_moved =
+	white_queenside_rook_has_moved =
+	black_kingside_rook_has_moved =
+	black_queenside_rook_has_moved =
+	white_king_has_castled =
+	black_king_has_castled =
+		false);
 
-let black_kingside_rook_has_moved = false;
-let black_queenside_rook_has_moved = false;
+// keep track for en passant purposes
+var last_move = null;
 
-let white_king_has_castled = false;
-let black_king_has_castled = false;
+// let white_king_has_moved = false;
+
+// let white_kingside_rook_has_moved = false;
+// let white_queenside_rook_has_moved = false;
+
+// let black_kingside_rook_has_moved = false;
+// let black_queenside_rook_has_moved = false;
+
+// let white_king_has_castled = false;
+// let black_king_has_castled = false;
 
 // create board and pieces according to starting board ^
 for (let i = 0; i < board.length; i++) {
@@ -284,6 +298,11 @@ function make_move(from, to, board) {
 	const from_j = file_rank_to_idx(from)[1];
 	const to_i = file_rank_to_idx(to)[0];
 	const to_j = file_rank_to_idx(to)[1];
+	const color = board[from_i][from_j] > 0 ? 1 : -1;
+
+	last_move = `${board[from_i][from_j]}:${from}:${to}`;
+
+	console.log(last_move);
 
 	// if move is a capture, remove captured piece
 	if (board[to_i][to_j] != 0) {
@@ -330,14 +349,31 @@ function make_move(from, to, board) {
 			(!black_king_has_castled && (to == "g8" || to == "c8")))
 	) {
 		do_castle(from, to, board);
+	} else if (
+		Math.abs(board[from_i][from_j]) == 1 &&
+		from_j != to_j &&
+		board[to_i][to_j] == 0
+	) {
+		// en passant case
+
+		// remove captured pawn
+		board[to_i + color][to_j] = 0;
+		$(`.${idx_to_filerank(to_i + color, to_j)}`)
+			.first()
+			.remove();
+
+		// move capturing pawn to new square
+		board[to_i][to_j] = board[from_i][from_j];
+		board[from_i][from_j] = 0;
 	} else {
+		console.log("ASDFASDF", to_i, to_j);
 		// else reg move
 		// set to piece as from piece and from piece is now empty (0)
 		board[to_i][to_j] = board[from_i][from_j];
 		board[from_i][from_j] = 0;
 
 		// pawns promote to queens if they reach opposite last rank
-		if (board[to_i][to_j] == 1 && to_i == 7) {
+		if (board[to_i][to_j] == 1 && to_i == 0) {
 			board[to_i][to_j] = 6;
 			console.log($(`.${idx_to_filerank(from_i, from_j)}`)[0]);
 			$(`.${idx_to_filerank(from_i, from_j)}`)
@@ -345,7 +381,7 @@ function make_move(from, to, board) {
 				.attr("src", "pieces/white_queen.png");
 		}
 
-		if (board[to_i][to_j] == -1 && to_i == 0) {
+		if (board[to_i][to_j] == -1 && to_i == 7) {
 			board[to_i][to_j] = -6;
 			$(`.${idx_to_filerank(from_i, from_j)}`)
 				.first()
@@ -404,8 +440,8 @@ function get_legal_moves(from, board) {
 // #region MOVE LOGIC
 function get_legal_pawn_moves(from, board) {
 	const rank = parseInt(from[1]);
-	let from_i = file_rank_to_idx(from)[0];
-	let from_j = file_rank_to_idx(from)[1];
+	const from_i = file_rank_to_idx(from)[0];
+	const from_j = file_rank_to_idx(from)[1];
 
 	const legal_moves = [];
 	const color = board[from_i][from_j] < 0 ? -1 : 1;
@@ -422,8 +458,9 @@ function get_legal_pawn_moves(from, board) {
 		legal_moves.push(idx_to_filerank(candidate_i, candidate_j));
 
 		// now same for up two, if on starting rank
+		// console.log(from, color, candidate_i, candidate_j);
 		if (
-			((color == -1 && rank == 7) || (color == 1 && rank == 2)) &&
+			((color == -1 && from_i == 1) || (color == 1 && from_i == 6)) &&
 			board[candidate_i - color][candidate_j] == 0
 		) {
 			legal_moves.push(idx_to_filerank(candidate_i - color, candidate_j));
@@ -447,8 +484,42 @@ function get_legal_pawn_moves(from, board) {
 		}
 	});
 
-	// bleh, en passant
-	// bleh, filter for illegal revealed checks
+	// last_move = piece:filerank:filerank
+
+	if (last_move) {
+		let lm = last_move.split(":");
+		let f = lm[1];
+		let t = lm[2];
+		let p = lm[0];
+
+		let f_i = file_rank_to_idx(f)[0];
+		let t_i = file_rank_to_idx(t)[0];
+		let t_j = file_rank_to_idx(t)[1];
+
+		// now check for en passant
+		if (color == 1) {
+			if (from_i == 3 && t_i == 3 && f_i == 1 && p == "-1") {
+				if (from_j > 0 && t_j == from_j - 1) {
+					legal_moves.push(idx_to_filerank(from_i - 1, from_j - 1));
+				}
+
+				if (from_j < 7 && t_j == from_j + 1) {
+					legal_moves.push(idx_to_filerank(from_i - 1, from_j + 1));
+				}
+			}
+		} else if (color == -1) {
+			if (from_i == 4 && t_i == 4 && f_i == 6 && p == "1") {
+				if (from_j > 0 && t_j == from_j - 1) {
+					legal_moves.push(idx_to_filerank(from_i + 1, from_j - 1));
+				}
+
+				if (from_j < 7 && t_j == from_j + 1) {
+					legal_moves.push(idx_to_filerank(from_i + 1, from_j + 1));
+				}
+			}
+		}
+	}
+
 	return legal_moves;
 }
 
