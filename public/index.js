@@ -280,15 +280,10 @@ function do_castle(from, to, board) {
 }
 
 function make_move(from, to, board) {
-	const from_rank = parseInt(from[1]);
-	const from_file = from[0];
-	const from_i = 7 - from_rank + 1;
-	const from_j = "abcdefgh".indexOf(from_file);
-
-	const to_rank = parseInt(to[1]);
-	const to_file = to[0];
-	const to_i = 7 - to_rank + 1;
-	const to_j = "abcdefgh".indexOf(to_file);
+	const from_i = file_rank_to_idx(from)[0];
+	const from_j = file_rank_to_idx(from)[1];
+	const to_i = file_rank_to_idx(to)[0];
+	const to_j = file_rank_to_idx(to)[1];
 
 	// if move is a capture, remove captured piece
 	if (board[to_i][to_j] != 0) {
@@ -304,44 +299,35 @@ function make_move(from, to, board) {
 		black_king_has_moved = true;
 	}
 
-	if (
-		board[from_i][from_j] == 4 &&
-		from_j == 0 &&
-		!white_queenside_rook_has_moved
-	) {
-		white_queenside_rook_has_moved = true;
+	if (board[from_i][from_j] == 4) {
+		if (from_j == 0 && !white_queenside_rook_has_moved) {
+			white_queenside_rook_has_moved = true;
+		} else if (from_j == 7 && !white_kingside_rook_has_moved) {
+			white_kingside_rook_has_moved = true;
+		}
 	}
 
-	if (
-		board[from_i][from_j] == 4 &&
-		from_j == 7 &&
-		!white_kingside_rook_has_moved
-	) {
-		white_kingside_rook_has_moved = true;
+	if (board[from_i][from_j] == -4) {
+		if (from_j == 0 && !black_queenside_rook_has_moved) {
+			black_queenside_rook_has_moved = true;
+		} else if (from_j == 7 && !black_kingside_rook_has_moved) {
+			black_kingside_rook_has_moved = true;
+		}
 	}
 
-	if (
-		board[from_i][from_j] == -4 &&
-		from_j == 0 &&
-		!black_queenside_rook_has_moved
-	) {
-		black_queenside_rook_has_moved = true;
-	}
-
-	if (
-		board[from_i][from_j] == 4 &&
-		from_j == 7 &&
-		!black_kingside_rook_has_moved
-	) {
-		black_kingside_rook_has_moved = true;
-	}
+	Math.abs(board[from_i][from_j]) == 5 &&
+		((!white_king_has_castled &&
+			(from == "e1" || from == "e8") &&
+			(to == "g1" || to == "c1")) ||
+			(!black_king_has_castled && (to == "g8" || to == "c8")));
 
 	// if castling
 	if (
-		(Math.abs(board[from_i][from_j]) == 5 &&
-			!white_king_has_castled &&
+		Math.abs(board[from_i][from_j]) == 5 &&
+		((!white_king_has_castled &&
+			(from == "e1" || from == "e8") &&
 			(to == "g1" || to == "c1")) ||
-		(!black_king_has_castled && (to == "g8" || to == "c8"))
+			(!black_king_has_castled && (to == "g8" || to == "c8")))
 	) {
 		do_castle(from, to, board);
 	} else {
@@ -351,7 +337,7 @@ function make_move(from, to, board) {
 		board[from_i][from_j] = 0;
 
 		// pawns promote to queens if they reach opposite last rank
-		if (board[to_i][to_j] == 1 && to_rank == 8) {
+		if (board[to_i][to_j] == 1 && to_i == 7) {
 			board[to_i][to_j] = 6;
 			console.log($(`.${idx_to_filerank(from_i, from_j)}`)[0]);
 			$(`.${idx_to_filerank(from_i, from_j)}`)
@@ -359,7 +345,7 @@ function make_move(from, to, board) {
 				.attr("src", "pieces/white_queen.png");
 		}
 
-		if (board[to_i][to_j] == -1 && to_rank == 1) {
+		if (board[to_i][to_j] == -1 && to_i == 0) {
 			board[to_i][to_j] = -6;
 			$(`.${idx_to_filerank(from_i, from_j)}`)
 				.first()
@@ -553,11 +539,13 @@ function get_legal_king_moves(from, board) {
 		(elt) => !attacked_squares.includes(elt)
 	);
 
-	// now check castling
+	// now check if castling is legal
 
+	// white kingside castle
 	if (
 		board[from_i][from_j] == 5 &&
-		!(white_king_has_moved || white_kingside_rook_has_moved) &&
+		!white_king_has_moved &&
+		!white_kingside_rook_has_moved &&
 		board[7][5] == 0 &&
 		board[7][6] == 0 &&
 		!attacked_squares.includes("f1") &&
@@ -567,6 +555,7 @@ function get_legal_king_moves(from, board) {
 		filtered.push("g1");
 	}
 
+	// white queenside castle
 	if (
 		board[from_i][from_j] == 5 &&
 		!(white_king_has_moved || white_queenside_rook_has_moved) &&
@@ -580,6 +569,7 @@ function get_legal_king_moves(from, board) {
 		filtered.push("c1");
 	}
 
+	// black kingside castle
 	if (
 		board[from_i][from_j] == -5 &&
 		!(black_king_has_moved || black_kingside_rook_has_moved) &&
@@ -592,6 +582,7 @@ function get_legal_king_moves(from, board) {
 		filtered.push("g8");
 	}
 
+	// black queenside castle
 	if (
 		board[from_i][from_j] == -5 &&
 		!(black_king_has_moved || black_queenside_rook_has_moved) &&
