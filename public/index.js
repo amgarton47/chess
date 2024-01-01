@@ -21,6 +21,11 @@ engine.onmessage = function (event) {
 		// console.log(event.data.split(" ")[1]);
 		e_move = event.data.split(" ")[1];
 		console.log(e_move);
+		make_computer_move(
+			e_move.substring(0, 2),
+			e_move.substring(2, 4),
+			board
+		);
 	}
 };
 
@@ -35,7 +40,8 @@ engine.onmessage = function (event) {
 // 	[4, 3, 2, 6, 5, 2, 3, 4],
 // ];
 
-const start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+// const start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const start_pos = "8/2p4p/p7/3k4/8/3K4/1p4r1/8 w - - 0 40";
 const board = FEN_to_board(start_pos);
 
 function FEN_to_board(fen) {
@@ -131,20 +137,13 @@ for (let i = 0; i < board.length; i++) {
 			const pos = square.getBoundingClientRect();
 
 			$("body").append(
-				`<img id="${
+				`<img src="${piece_img}" class="piece ${
 					file + rank
-				}_${piece_color}_${piece_name}" src="${piece_img}" class="piece ${
-					file + rank
-				}" style="top:${pos.top + 2.5 + "px"}; left:${
+				} ${piece_color}" style="top:${pos.top + 2.5 + "px"}; left:${
 					pos.left + 2.5 + "px"
 				};" draggable="false">`
 			);
-
-			dragElement(
-				document.getElementById(
-					`${file}${rank}_${piece_color}_${piece_name}`
-				)
-			);
+			dragElement(document.getElementsByClassName(`${file}${rank}`)[0]);
 		}
 	}
 }
@@ -188,8 +187,7 @@ function dragElement(elt) {
 		}
 
 		// get color of piece trying to be moved
-		const piece_id = $(`.${start_square}`)[0].id;
-		piece_color = piece_id.indexOf("white") > -1 ? 1 : -1;
+		piece_color = $(`.${start_square}`).first().hasClass("white") ? 1 : -1;
 
 		elt.classList.add("active");
 
@@ -200,7 +198,9 @@ function dragElement(elt) {
 			const class_name =
 				board[i][j] != 0 ? "legal_move_capture" : "legal_move";
 
-			$(`#${m}`).append(`<div class="${class_name}"></div>`);
+			// add legal_move ui, but only if not already there (prevents double adding bug)
+			if ($(`#${m} div`).length == 0)
+				$(`#${m}`).append(`<div class="${class_name}"></div>`);
 		});
 
 		// snap piece to center of cursor
@@ -254,7 +254,6 @@ function dragElement(elt) {
 			is_legal_move(start_square, current_square.id, board) &&
 			piece_color * whose_turn > 0
 		) {
-			whose_turn *= -1;
 			// snap piece to center of square
 			const position = document
 				.getElementById(current_square.id)
@@ -350,9 +349,7 @@ function make_move(from, to, board) {
 	const piece_type = Math.abs(board[from_i][from_j]);
 	let is_capture = board[to_i][to_j] != 0 ? 1 : 0;
 	let is_promotion = false;
-
 	let is_ambigious = is_ambiguous_move(from, to, board);
-
 	let is_castle = 0;
 
 	// if move is a capture, remove captured piece
@@ -493,8 +490,38 @@ function make_move(from, to, board) {
 		half_move_clock += 1;
 	}
 
-	// engine.postMessage(`position fen ${get_FEN(board, whose_turn)}`);
-	// console.log(get_FEN(board, whose_turn));
+	engine.postMessage(`position fen ${get_FEN(board, whose_turn * -1)}`);
+
+	// console.log(whose_turn);
+	if (whose_turn == 1) {
+		engine.postMessage("go depth 6");
+	}
+
+	whose_turn *= -1;
+}
+
+function make_computer_move(from, to, board) {
+	const position = document.getElementById(to).getBoundingClientRect();
+
+	let startx = position.top + 2.5;
+	let starty = position.left + 2.5;
+
+	const elt = document.getElementsByClassName(from)[0];
+
+	elt.style.top = startx + "px";
+	elt.style.left = starty + "px";
+
+	make_move(from, to, board);
+
+	// change piece's square class
+	elt.classList.forEach((class_name) => {
+		if (/[abcdefgh][12345678]/.test(class_name)) {
+			elt.classList.remove(class_name);
+		}
+	});
+	elt.classList.add(to);
+
+	dragElement(elt);
 }
 
 function is_ambiguous_move(from, to, board) {
@@ -948,6 +975,41 @@ function get_king_square(color, board) {
 	}
 }
 
+function get_king_attacking_squares(from) {
+	let from_i = filerank_to_idx(from)[0];
+	let from_j = filerank_to_idx(from)[1];
+	const attacking = [];
+
+	const dirs = [
+		[-1, -1],
+		[-1, 1],
+		[1, -1],
+		[1, 0],
+		[-1, 0],
+		[0, -1],
+		[0, 1],
+		[1, 1],
+	];
+
+	dirs.forEach((dir) => {
+		const di = dir[0];
+		const dj = dir[1];
+		let candidate_i = from_i + di;
+		let candidate_j = from_j + dj;
+
+		if (
+			candidate_i <= 7 &&
+			candidate_i >= 0 &&
+			candidate_j <= 7 &&
+			candidate_j >= 0
+		) {
+			attacking.push(idx_to_filerank(candidate_i, candidate_j));
+		}
+	});
+
+	return attacking;
+}
+
 function filter_revealed_checks(from, moves, board) {
 	let from_i = filerank_to_idx(from)[0];
 	let from_j = filerank_to_idx(from)[1];
@@ -1006,7 +1068,7 @@ function get_attacked_squares(color, board) {
 					);
 				}
 
-				// special case for diagonals of pawns since they are not legal moves in this situation
+				// special case for diagonals of pawns since they are not legal moves in this context
 				if (Math.abs(board[i][j]) == 1) {
 					if (i + color <= 7 && i + color >= 0) {
 						if (j + 1 <= 7) {
@@ -1018,6 +1080,9 @@ function get_attacked_squares(color, board) {
 						}
 					}
 				}
+			} else if (board[i][j] * color < 0 && Math.abs(board[i][j]) == 5) {
+				const from = idx_to_filerank(i, j);
+				attacked = attacked.concat(get_king_attacking_squares(from));
 			}
 		}
 	}
@@ -1068,10 +1133,8 @@ function get_short_moves(dirs, from_i, from_j, board) {
 		const dj = dir[1];
 		let candidate_i = from_i + di;
 		let candidate_j = from_j + dj;
-		let stop = false;
 
 		if (
-			!stop &&
 			candidate_i <= 7 &&
 			candidate_i >= 0 &&
 			candidate_j <= 7 &&
