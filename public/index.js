@@ -38,15 +38,14 @@ engine.postMessage("ucinewgame");
 engine.onmessage = function (event) {
 	// console.log(event.data);
 	if (event.data.indexOf("bestmove") != -1) {
-		// console.log(event.data.split(" ")[1]);
 		const e_move = event.data.split(" ")[1];
 		console.log(e_move);
-		// make_computer_move(
-		// 	e_move.substring(0, 2),
-		// 	e_move.substring(2, 4),
-		// 	board,
-		// 	e_move.length == 5 ? e_move.substring(4, 5) : null
-		// );
+		make_computer_move(
+			e_move.substring(0, 2),
+			e_move.substring(2, 4),
+			board,
+			e_move.length == 5 ? e_move.substring(4, 5) : null
+		);
 	}
 };
 
@@ -64,72 +63,6 @@ engine.onmessage = function (event) {
 const start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 // const start_pos = "8/2p4p/p7/3k4/8/3K4/1p4r1/8 w - - 0 40";
 const board = FEN_to_board(start_pos);
-
-function FEN_to_board(fen) {
-	fen = fen.split(" ");
-	const player_to_move = fen[1];
-	const castling = fen[2];
-	const en_passant = fen[3];
-	half_move_clock = fen[4];
-	full_move_clock = fen[5];
-
-	whose_turn = player_to_move == "w" ? 1 : "b";
-
-	black_king_has_moved = black_king_has_castled =
-		castling.indexOf("k") == -1 && castling.indexOf("q") == -1;
-
-	black_kingside_rook_has_moved = castling.indexOf("k") == -1;
-	black_queenside_rook_has_moved = castling.indexOf("q") == -1;
-
-	white_king_has_moved = white_king_has_castled =
-		castling.indexOf("K") == -1 && castling.indexOf("Q") == -1;
-
-	white_kingside_rook_has_moved = castling.indexOf("K") == -1;
-	white_queenside_rook_has_moved = castling.indexOf("Q") == -1;
-
-	if (en_passant != "-") {
-		last_move = en_passant;
-	}
-
-	const pieces = fen[0].replaceAll("/", "");
-	const board = new Array(8).fill(0).map(() => new Array(8).fill(0));
-
-	const piece_map = {
-		P: 1,
-		B: 2,
-		N: 3,
-		R: 4,
-		K: 5,
-		Q: 6,
-		p: -1,
-		b: -2,
-		n: -3,
-		r: -4,
-		k: -5,
-		q: -6,
-	};
-
-	let i = 0;
-	let j = 0;
-
-	for (let p = 0; p < pieces.length; p++) {
-		const c = pieces[p];
-
-		if (/[a-zA-Z]/.test(c)) {
-			board[i][j] = piece_map[c];
-			j += 1;
-		} else {
-			j += parseInt(c);
-		}
-
-		if (j == 8) {
-			j = 0;
-			i += 1;
-		}
-	}
-
-	return board;
-}
 
 // create board and pieces according to starting board
 for (let i = 0; i < board.length; i++) {
@@ -308,52 +241,8 @@ function dragElement(elt) {
 	}
 }
 
-function do_castle(from, to, board) {
-	const from_i = filerank_to_idx(from)[0];
-	const from_j = filerank_to_idx(from)[1];
-
-	const to_i = filerank_to_idx(to)[0];
-	const to_j = filerank_to_idx(to)[1];
-
-	const color = board[from_i][from_j] > 0 ? 1 : -1;
-
-	// dynamically get rook start and end position
-	const rook_i = color == -1 ? 0 : 7;
-	const rook_start_j = to_j < 4 ? 0 : 7;
-	const rook_end_j = to_j < 4 ? 3 : 5;
-
-	// make rook and king moves on board representation
-	board[from_i][from_j] = 0;
-	board[to_i][to_j] = 5 * color;
-	board[rook_i][rook_end_j] = 4 * color;
-	board[rook_i][rook_start_j] = 0;
-
-	// move rook to end square on "physical" board
-	const position = document
-		.getElementById(idx_to_filerank(rook_i, rook_end_j))
-		.getBoundingClientRect();
-	let x = position.top + 2.5;
-	let y = position.left + 2.5;
-
-	const elt = document.getElementsByClassName(
-		idx_to_filerank(rook_i, rook_start_j)
-	)[0];
-
-	elt.style.top = x + "px";
-	elt.style.left = y + "px";
-
-	// update rooks square class and call dragElement to reset startx and starty
-	elt.classList.remove(idx_to_filerank(rook_i, rook_start_j));
-	elt.classList.add(idx_to_filerank(rook_i, rook_end_j));
-	dragElement(elt);
-
-	// mark castled as true
-	if (color == -1) {
-		black_king_has_castled = true;
-	} else {
-		white_king_has_castled = true;
-	}
-}
+// #region MOVE LOGIC
+// all the fun move logic 😍
 
 function make_move(from, to, board, promote = "q") {
 	const from_i = filerank_to_idx(from)[0];
@@ -526,6 +415,53 @@ function make_move(from, to, board, promote = "q") {
 	whose_turn *= -1;
 }
 
+function do_castle(from, to, board) {
+	const from_i = filerank_to_idx(from)[0];
+	const from_j = filerank_to_idx(from)[1];
+
+	const to_i = filerank_to_idx(to)[0];
+	const to_j = filerank_to_idx(to)[1];
+
+	const color = board[from_i][from_j] > 0 ? 1 : -1;
+
+	// dynamically get rook start and end position
+	const rook_i = color == -1 ? 0 : 7;
+	const rook_start_j = to_j < 4 ? 0 : 7;
+	const rook_end_j = to_j < 4 ? 3 : 5;
+
+	// make rook and king moves on board representation
+	board[from_i][from_j] = 0;
+	board[to_i][to_j] = 5 * color;
+	board[rook_i][rook_end_j] = 4 * color;
+	board[rook_i][rook_start_j] = 0;
+
+	// move rook to end square on "physical" board
+	const position = document
+		.getElementById(idx_to_filerank(rook_i, rook_end_j))
+		.getBoundingClientRect();
+	let x = position.top + 2.5;
+	let y = position.left + 2.5;
+
+	const elt = document.getElementsByClassName(
+		idx_to_filerank(rook_i, rook_start_j)
+	)[0];
+
+	elt.style.top = x + "px";
+	elt.style.left = y + "px";
+
+	// update rooks square class and call dragElement to reset startx and starty
+	elt.classList.remove(idx_to_filerank(rook_i, rook_start_j));
+	elt.classList.add(idx_to_filerank(rook_i, rook_end_j));
+	dragElement(elt);
+
+	// mark castled as true
+	if (color == -1) {
+		black_king_has_castled = true;
+	} else {
+		white_king_has_castled = true;
+	}
+}
+
 function make_computer_move(from, to, board, promote = "q") {
 	const position = document.getElementById(to).getBoundingClientRect();
 
@@ -582,8 +518,6 @@ function is_ambiguous_move(from, to, board) {
 	return unique_acn;
 }
 
-// #region MOVE LOGIC
-// all the fun move logic 😍
 // checks if "to" square is in list of legal "from" squares
 function is_legal_move(from, to, board) {
 	return get_legal_moves(from, board).includes(to);
@@ -887,10 +821,6 @@ function get_legal_king_moves(from, board) {
 	return filtered;
 }
 
-function in_bounds(i, j) {
-	return i >= 0 && i <= 7 && j >= 0 && j <= 7;
-}
-
 // if legal_moves is set to false, gets all squares attacked by piece on from square
 // if legal_moves is set to true, gets all legal moves for piece on from square (these are only slightly different, so this consolidates code)
 function get_long_attacks(dirs, from, board, legal_moves = false) {
@@ -952,16 +882,6 @@ function get_short_attacks(dirs, from, board, legal_moves) {
 	return attacking;
 }
 
-function get_king_square(color, board) {
-	for (let i = 0; i < board.length; i++) {
-		for (let j = 0; j < board[0].length; j++) {
-			if (board[i][j] * color == 5) {
-				return idx_to_filerank(i, j);
-			}
-		}
-	}
-}
-
 function filter_revealed_checks(from, moves, board) {
 	let from_i = filerank_to_idx(from)[0];
 	let from_j = filerank_to_idx(from)[1];
@@ -987,6 +907,20 @@ function filter_revealed_checks(from, moves, board) {
 	return moves.filter((m) => !to_remove.includes(m));
 }
 // #endregion
+
+function get_king_square(color, board) {
+	for (let i = 0; i < board.length; i++) {
+		for (let j = 0; j < board[0].length; j++) {
+			if (board[i][j] * color == 5) {
+				return idx_to_filerank(i, j);
+			}
+		}
+	}
+}
+
+function in_bounds(i, j) {
+	return i >= 0 && i <= 7 && j >= 0 && j <= 7;
+}
 
 function check_game_status(whose_turn, board) {
 	// check if game is over
@@ -1140,4 +1074,70 @@ function get_FEN(board, whose_turn) {
 	return `${pieces} ${
 		whose_turn == 1 ? "w" : "b"
 	} ${castles} ${en_passant} ${half_move_clock} ${full_move_clock}`;
+}
+
+function FEN_to_board(fen) {
+	fen = fen.split(" ");
+	const player_to_move = fen[1];
+	const castling = fen[2];
+	const en_passant = fen[3];
+	half_move_clock = fen[4];
+	full_move_clock = fen[5];
+
+	whose_turn = player_to_move == "w" ? 1 : "b";
+
+	black_king_has_moved = black_king_has_castled =
+		castling.indexOf("k") == -1 && castling.indexOf("q") == -1;
+
+	black_kingside_rook_has_moved = castling.indexOf("k") == -1;
+	black_queenside_rook_has_moved = castling.indexOf("q") == -1;
+
+	white_king_has_moved = white_king_has_castled =
+		castling.indexOf("K") == -1 && castling.indexOf("Q") == -1;
+
+	white_kingside_rook_has_moved = castling.indexOf("K") == -1;
+	white_queenside_rook_has_moved = castling.indexOf("Q") == -1;
+
+	if (en_passant != "-") {
+		last_move = en_passant;
+	}
+
+	const pieces = fen[0].replaceAll("/", "");
+	const board = new Array(8).fill(0).map(() => new Array(8).fill(0));
+
+	const piece_map = {
+		P: 1,
+		B: 2,
+		N: 3,
+		R: 4,
+		K: 5,
+		Q: 6,
+		p: -1,
+		b: -2,
+		n: -3,
+		r: -4,
+		k: -5,
+		q: -6,
+	};
+
+	let i = 0;
+	let j = 0;
+
+	for (let p = 0; p < pieces.length; p++) {
+		const c = pieces[p];
+
+		if (/[a-zA-Z]/.test(c)) {
+			board[i][j] = piece_map[c];
+			j += 1;
+		} else {
+			j += parseInt(c);
+		}
+
+		if (j == 8) {
+			j = 0;
+			i += 1;
+		}
+	}
+
+	return board;
 }
